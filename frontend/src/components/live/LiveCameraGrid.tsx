@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useAlert } from '../../context/AlertContext';
-import { fetchApi, wsClient } from '../../services/api';
+import { fetchApi, wsClient, BACKEND_URL } from '../../services/api';
 import { WildlifeSpecies, ThreatLevel, Camera, Zone, Incident, CameraSourceType, CameraProtocol, CameraPriority, BoundingBox, CameraFeed } from '../../types/index';
 import { wildlifeData } from '../../data/wildlifeInfo';
 import { CameraPlayer } from './CameraPlayer';
@@ -308,7 +308,9 @@ export const LiveCameraGrid: React.FC = () => {
             <div className="text-[9px] font-black text-slate-500 uppercase mb-1">System Status</div>
             <div className="flex items-center space-x-2">
               <div className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-              <span className="text-[10px] text-rose-400 font-mono">ERR_CONNECTION_REFUSED (5000)</span>
+              <span className="text-[10px] text-rose-400 font-mono truncate" title={BACKEND_URL}>
+                ERR_CONNECTION_REFUSED ({BACKEND_URL})
+              </span>
             </div>
           </div>
         </div>

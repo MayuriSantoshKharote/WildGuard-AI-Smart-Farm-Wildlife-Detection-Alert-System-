@@ -184,7 +184,8 @@ class DetectionServerHandler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, ngrok-skip-browser-warning, bypass-tunnel-reminder")
+        self.send_header("Access-Control-Allow-Credentials", "true")
         self.send_header("Content-Type", content_type)
         self.end_headers()
 
@@ -279,17 +280,22 @@ class DetectionServerHandler(BaseHTTPRequestHandler):
 
 
 def run_server(port: int = 8000, host: str = "0.0.0.0"):
-    """Start the multi-threaded HTTP Detection Server."""
+    """
+    Start the multi-threaded HTTP Detection Server.
+    Binds ThreadingHTTPServer to ('0.0.0.0', 8000) instead of '127.0.0.1'
+    so mobile devices and HTTPS tunnels can reach the detection endpoint.
+    """
     # Preload model and alarm
     get_model()
     get_alarm()
 
-    server_address = (host, port)
+    server_address = ("0.0.0.0", port)
     httpd = ThreadingHTTPServer(server_address, DetectionServerHandler)
 
     print("=======================================================")
     print(f"🐾 WildGuard AI – YOLOv8 Edge Detection Server ACTIVE")
-    print(f"📡 Endpoint: http://localhost:{port}/detect")
+    print(f"📡 Bound to: ('0.0.0.0', {port}) | Endpoint: http://0.0.0.0:{port}/detect")
+    print(f"🌐 Mobile & Tunnel Accessibility: ENABLED (All Network Interfaces)")
     print(f"🔊 Software Acoustic Alarm: audio_alarm.py (Cooldown: {ALARM_COOLDOWN_SECONDS}s)")
     print(f"🎯 Mission: Leopard Detection (Panthera pardus, conf > 0.50)")
     print(f"⚡ Ready to receive webcam frames from React frontend & backend")
@@ -391,6 +397,8 @@ if __name__ == "__main__":
                         help="Run mode: 'server' (default, HTTP endpoint for React frontend) or 'preview' (OpenCV window)")
     parser.add_argument("--source", default=None,
                         help="Webcam index (0) or path to video/image file (forces preview mode)")
+    parser.add_argument("--host", default="0.0.0.0",
+                        help="Host interface to bind HTTP Detection Server (default: 0.0.0.0)")
     parser.add_argument("--port", type=int, default=8000,
                         help="Port for HTTP Detection Server (default: 8000)")
     args = parser.parse_args()
@@ -398,4 +406,4 @@ if __name__ == "__main__":
     if args.source is not None or args.mode == "preview":
         run_inference(source=args.source if args.source is not None else 0)
     else:
-        run_server(port=args.port)
+        run_server(port=args.port, host=args.host)

@@ -246,11 +246,15 @@ apiRouter.post('/simulation/trigger', (req: Request, res: Response) => {
 // 8. EXTERNAL AI MODEL CONNECTOR (YOLOv8 / OpenCV)
 // ==========================================
 apiRouter.get('/ai/status', async (req: Request, res: Response) => {
-  const aiServiceUrl = process.env.AI_SERVICE_URL || 'http://127.0.0.1:8000/health';
+  const aiBase = (process.env.AI_URL || 'http://127.0.0.1:8000').replace(/\/+$/, '');
+  const aiServiceUrl = process.env.AI_SERVICE_URL || `${aiBase}/health`;
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 1200);
-    const response = await fetch(aiServiceUrl, { signal: controller.signal });
+    const response = await fetch(aiServiceUrl, {
+      signal: controller.signal,
+      headers: { 'ngrok-skip-browser-warning': 'true' }
+    });
     clearTimeout(timeout);
     if (response.ok) {
       const data = await response.json();
@@ -271,7 +275,8 @@ apiRouter.post('/ai/detect-frame', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: 'No image frame provided in request payload.' });
     }
 
-    const aiEndpoint = process.env.AI_DETECT_URL || 'http://127.0.0.1:8000/detect';
+    const aiBase = (process.env.AI_URL || 'http://127.0.0.1:8000').replace(/\/+$/, '');
+    const aiEndpoint = process.env.AI_DETECT_URL || `${aiBase}/detect`;
     let aiData: any;
 
     try {
@@ -279,7 +284,10 @@ apiRouter.post('/ai/detect-frame', async (req: Request, res: Response) => {
       const timeout = setTimeout(() => controller.abort(), 3500);
       const aiResponse = await fetch(aiEndpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'ngrok-skip-browser-warning': 'true'
+        },
         body: JSON.stringify({ image: imagePayload }),
         signal: controller.signal
       });

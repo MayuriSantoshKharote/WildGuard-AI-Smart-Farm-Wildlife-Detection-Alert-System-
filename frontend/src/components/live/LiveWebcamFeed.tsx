@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { CameraOff, Volume2, VolumeX, ShieldAlert, Zap, RefreshCw, Eye, EyeOff, Maximize, Minimize, FlipHorizontal } from 'lucide-react';
 import { useAlert } from '../../context/AlertContext';
-import { fetchApi } from '../../services/api';
+import { fetchApi, AI_URL } from '../../services/api';
 import { audioSiren } from '../../services/audioSiren';
 
 interface LiveWebcamFeedProps {
@@ -119,22 +119,49 @@ export const LiveWebcamFeed: React.FC<LiveWebcamFeedProps> = ({
         captureCtx.drawImage(videoRef.current, 0, 0, captureCanvas.width, captureCanvas.height);
         const frameDataUrl = captureCanvas.toDataURL('image/jpeg', 0.65);
 
-        // Post to backend which routes to Python YOLO service
-        const response = await fetchApi<{
+        // Attempt detection through backend API proxy with fallback to direct AI_URL
+        let response: {
           success: boolean;
           detections: DetectionBox[];
           leopardAlert: boolean;
           alarmTriggered: boolean;
           cooldownRemaining?: number;
           error?: string;
-        }>('/ai/detect-frame', {
-          method: 'POST',
-          body: JSON.stringify({
-            image: frameDataUrl,
-            cameraId,
-            zoneId
-          })
-        });
+        };
+
+        try {
+          response = await fetchApi<{
+            success: boolean;
+            detections: DetectionBox[];
+            leopardAlert: boolean;
+            alarmTriggered: boolean;
+            cooldownRemaining?: number;
+            error?: string;
+          }>('/ai/detect-frame', {
+            method: 'POST',
+            body: JSON.stringify({
+              image: frameDataUrl,
+              cameraId,
+              zoneId
+            })
+          });
+        } catch (backendErr) {
+          // Fallback: direct inference call to AI detection service (e.g. VITE_AI_URL or localhost:8000)
+          const directRes = await fetch(`${AI_URL}/detect`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'ngrok-skip-browser-warning': 'true'
+            },
+            body: JSON.stringify({
+              image: frameDataUrl,
+              cameraId,
+              zoneId
+            })
+          });
+          if (!directRes.ok) throw backendErr;
+          response = await directRes.json();
+        }
 
         if (response.success) {
           setAiConnected(true);
@@ -447,7 +474,7 @@ export const LiveWebcamFeed: React.FC<LiveWebcamFeedProps> = ({
               : 'bg-slate-900/80 text-slate-300 border-slate-700'
           }`}>
             <span className={`w-1.5 h-1.5 rounded-full ${aiConnected === true ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}`}></span>
-            <span>{aiConnected === true ? 'AI Service Connected (Port 8000)' : 'AI Service: Waiting on Port 8000...'}</span>
+            <span>{aiConnected === true ? 'AI Service Connected' : 'AI Service: Waiting on Server...'}</span>
           </span>
         </div>
 
@@ -497,7 +524,7 @@ export const LiveWebcamFeed: React.FC<LiveWebcamFeedProps> = ({
         <div className="absolute bottom-10 left-3 right-3 bg-amber-950/90 border border-amber-600/80 p-2.5 rounded-xl text-amber-200 text-xs flex items-center justify-between pointer-events-auto z-10 shadow-lg">
           <div className="flex items-center space-x-2">
             <Zap className="w-4 h-4 text-amber-400 flex-shrink-0 animate-pulse" />
-            <span>AI detection service offline on port 8000. Start it in terminal: <code>python yolo_detector.py</code></span>
+            <span>AI detection service offline. Start it in terminal: <code>python yolo_detector.py</code> (or verify VITE_AI_URL / VITE_BACKEND_URL)</span>
           </div>
           <span className="text-[10px] text-amber-300 font-bold uppercase">Ready to connect</span>
         </div>
